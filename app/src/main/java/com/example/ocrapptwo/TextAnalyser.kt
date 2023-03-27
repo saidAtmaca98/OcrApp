@@ -5,6 +5,7 @@ import android.util.Log
 import android.widget.Toast
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageCapture
+import androidx.camera.core.ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY
 import androidx.camera.core.ImageProxy
 import androidx.core.graphics.get
 import com.example.ocrapptwo.Global.HATA
@@ -50,6 +51,13 @@ class TextAnalyser(val coroutineScope: CoroutineScope) : ImageAnalysis.Analyzer 
                 val lastWord=lineFirstText.split(",").last()
 
                 if (firstWord == lastWord){
+
+                    imageCapture = ImageCapture.Builder()
+                        .setCaptureMode(CAPTURE_MODE_MINIMIZE_LATENCY)
+                        .build()
+
+                    
+
                     Global.TEXT.postValue(lineFirstText)
                     HATA.postValue(false)
 
