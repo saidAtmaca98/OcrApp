@@ -5,6 +5,7 @@ import android.util.Log
 import android.widget.Toast
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageCapture
+import androidx.camera.core.ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY
 import androidx.camera.core.ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY
 import androidx.camera.core.ImageProxy
 import androidx.core.graphics.get
@@ -34,6 +35,8 @@ class TextAnalyser(val coroutineScope: CoroutineScope) : ImageAnalysis.Analyzer 
 
 
             val blocks = result.textBlocks
+
+            val lastLineText = blocks.last().text
             Log.d("ewrer",blocks.toString())
            // Global.TEXT.postValue(firstBlock.text)
             for (block in result.textBlocks) {
@@ -47,13 +50,15 @@ class TextAnalyser(val coroutineScope: CoroutineScope) : ImageAnalysis.Analyzer 
 
 
 
-                val firstWord =lineFirstText.split(",").first()
-                val lastWord=lineFirstText.split(",").last()
+                val firstLinefirstWord =lineFirstText.split(",").first()
+                val firstLinelastWord=lineFirstText.split(",").last()
+                val lastLinefirstWord =lastLineText.split(",").first()
+                val lastLinelastWord=lastLineText.split(",").last()
 
-                if (firstWord == lastWord){
+                if (firstLinefirstWord == "ANKARA" && firstLinelastWord == "ANKARA" && lastLinefirstWord == "ANKARA" && lastLinelastWord == "ANKARA" ){
 
                     imageCapture = ImageCapture.Builder()
-                        .setCaptureMode(CAPTURE_MODE_MINIMIZE_LATENCY)
+                        .setCaptureMode(CAPTURE_MODE_MAXIMIZE_QUALITY)
                         .build()
 
                     

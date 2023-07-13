@@ -5,6 +5,8 @@ import android.app.Activity
 import android.content.ContentValues
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -18,6 +20,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.Observer
 import com.example.ocrapptwo.Global.HATA
 import com.example.ocrapptwo.databinding.ActivityMainBinding
@@ -39,8 +42,11 @@ class MainActivity : AppCompatActivity() {
     private lateinit var imageCapture: ImageCapture
     private var pickedImage: Uri? = null
     private lateinit var textRecognizer: TextRecognizer
-    private var photoTaken = false
+    private var photoTaken :MutableLiveData<Boolean> = MutableLiveData(false)
     private var photoUri : Uri? =null
+    lateinit var cameraProvider: ProcessCameraProvider
+    lateinit var imageAnalysisUseCase: ImageAnalysis
+    var firsPhotoTaken = false
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -55,18 +61,28 @@ class MainActivity : AppCompatActivity() {
 
         textRecognizer =TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
 
-        binding.cameraButton.setOnClickListener {
-            openCamera()
-        }
-        binding.galleryButton.setOnClickListener{
-            openGalery()
+
+
+        binding.newScanbutton.setOnClickListener {
+            binding.loadingGif.visibility = View.GONE
+            binding.frameConst.background = ContextCompat.getDrawable(this@MainActivity,R.drawable.frame_camera)
+            binding.frameConst.visibility = View.VISIBLE
+            binding.imagePreView.visibility = View.GONE
+            binding.newScanbutton.visibility = View.GONE
+            binding.cameraPreview.visibility = View.VISIBLE
+            firsPhotoTaken = false
+            startCamera()
         }
 
-        binding.analyzeButton.setOnClickListener {
-            if (pickedImage == null ){
-                Toast.makeText(this,"Pick A Photo",Toast.LENGTH_SHORT)
-            }else{
-                analysePhoto()
+        photoTaken.observe(this) {
+            if (it) {
+                binding.loadingGif.visibility = View.GONE
+                binding.frameConst.visibility = View.GONE
+                binding.imagePreView.visibility = View.VISIBLE
+                binding.newScanbutton.visibility = View.VISIBLE
+                binding.imagePreView.setImageURI(photoUri)
+               // binding.frameConst.background = ContextCompat.getDrawable(this@MainActivity,R.drawable.frame_camera)
+                Toast.makeText(this@MainActivity, "FOTO KAYDOLDU", Toast.LENGTH_SHORT).show()
             }
         }
 
@@ -77,9 +93,6 @@ class MainActivity : AppCompatActivity() {
 
             binding.textView.text = it
 
-            if (photoTaken){
-                binding.imageView.setImageURI(photoUri)
-            }
         })
 
         HATA.observe(this, Observer {
@@ -120,12 +133,13 @@ class MainActivity : AppCompatActivity() {
         val processCameraProvider = ProcessCameraProvider.getInstance(this)
         processCameraProvider.addListener({
             try {
-                val cameraProvider = processCameraProvider.get()
+                cameraProvider = processCameraProvider.get()
                 val previewUseCase = buildPreviewUseCase()
                 imageCapture = ImageCapture.Builder()
-                    .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
+                    .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
                     .build()
-                val imageAnalysisUseCase = buildImageAnalysisUseCase()
+
+                imageAnalysisUseCase = buildImageAnalysisUseCase()
                 cameraProvider.unbindAll()
                 cameraProvider.bindToLifecycle(
                     this,
@@ -133,11 +147,17 @@ class MainActivity : AppCompatActivity() {
                     previewUseCase,
                     imageCapture,
                     imageAnalysisUseCase)
+
+
             }  catch (e : Exception){
                 Toast.makeText(this, "Error Starting Camera", Toast.LENGTH_LONG).show()
             }
 
         }, ContextCompat.getMainExecutor(this))
+    }
+
+    private fun stopCamera(){
+        cameraProvider.unbind(imageAnalysisUseCase)
     }
 
 
@@ -163,7 +183,7 @@ class MainActivity : AppCompatActivity() {
                 //pickedImage = data?.extras?.get("data") as Uri?
 
                 pickedImage?.let {
-                    binding.imageView.setImageURI(it)
+                  //  binding.imageView.setImageURI(it)
 
 
 
@@ -190,7 +210,7 @@ class MainActivity : AppCompatActivity() {
 
 
                 pickedImage?.let {
-                    binding.imageView.setImageURI(it)
+                //    binding.imageView.setImageURI(it)
 
 
                 }
@@ -239,6 +259,8 @@ class MainActivity : AppCompatActivity() {
                     val inputImage =InputImage.fromMediaImage(image.image!!, image.imageInfo.rotationDegrees)
 
 
+
+                    inputImage.mediaImage
                     val currentTime = System.currentTimeMillis()
 
                     val contentValues = ContentValues()
@@ -272,6 +294,7 @@ class MainActivity : AppCompatActivity() {
                         ImageCapture.OutputFileOptions.Builder(file)
                     }
 
+                    if (!firsPhotoTaken){
 
                         val result= textRecognizer.process(inputImage)
                             .addOnSuccessListener {
@@ -279,45 +302,80 @@ class MainActivity : AppCompatActivity() {
                                 val blocks = it.textBlocks
                                 Log.d("ewrer",blocks.toString())
                                 // Global.TEXT.postValue(firstBlock.text)
+                                // val lastLineText :String? = blocks.last().text
                                 for (block in it.textBlocks) {
                                     val blockText = block.text
                                     val blockCornerPoints = block.cornerPoints
-                                    val blockFrame = block.boundingBox
                                     val lineFirstText = block.lines[0].text
-                                    val lineSecondText = block.lines[0].text
-                                    val lineThirdText = block.lines[0].text
+
+                                    val lastLineText :String = it.textBlocks.last().text
+
+                                    val firstLinefirstWord =lineFirstText.split(" ").first()
+                                    val firstLinelastWord=lineFirstText.split(" ").last()
+                                    val lastLinefirstWord =lastLineText?.let { it.split(" ").first() }
+                                    val lastLinelastWord=lastLineText?.let { it.split(" ").last() }
+
+                                    if (firstLinefirstWord == "KURYECEP" && firstLinelastWord == "KURYECEP" && lastLinefirstWord == "KURYECEP" && lastLinelastWord == "KURYECEP" ){
+                                        stopCamera()
+                                        firsPhotoTaken = true
+                                        binding.frameConst.background = ContextCompat.getDrawable(this@MainActivity,R.drawable.frame_camera_green)
+                                        binding.cameraPreview.visibility = View.GONE
+                                        binding.loadingGif.visibility = View.VISIBLE
+
+                                        try {
+                                           val converter = ImageConverter(this@MainActivity)
+
+                                            val bitoo = inputImage.mediaImage?.let { converter.convert(it) }
+                                            photoTaken.postValue(true)
+                                            binding.imagePreView.setImageBitmap(bitoo)
+                                        }catch (e:java.lang.Exception){
+                                            e.printStackTrace()
+                                        }
+
+
+                                        /* val bitmap =toBitmap(image)
+                                         Log.d("bitmappp",bitmap.toString())
+
+
+
+                                         binding.imagePreView.setImageBitmap(bitmap)
+                                         binding.loadingGif.visibility = View.GONE
+                                         binding.imagePreView.visibility = View.VISIBLE*/
 
 
 
 
-                                    val firstWord =lineFirstText.split(",").first()
-                                    val lastWord=lineFirstText.split(",").last()
-
-                                    if (firstWord == lastWord){
+                                        Toast.makeText(this@MainActivity, "FOTOĞRAF ALGILANDI", Toast.LENGTH_SHORT).show()
 
                                         val outputFileOptions = ImageCapture.OutputFileOptions.Builder(contentResolver, MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues).build()
+/*
                                         imageCapture.takePicture(outputFileOptions, cameraExecutor,
                                             object : ImageCapture.OnImageSavedCallback {
                                                 override fun onError(error: ImageCaptureException)
                                                 {
-                                                  Log.d("sadsdsdas","sdfsdfsdf")
+                                                    binding.loadingGif.visibility = View.GONE
+                                                    photoTaken.postValue(false)
+                                                    Log.d("kaydolmadiiii","sdfsdfsdf")
                                                 }
                                                 override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
-                                                   photoUri =outputFileResults.savedUri
-                                                    Log.d("uyuyuyuyuy","sdfsdfsdf")
+                                                    photoUri =outputFileResults.savedUri
+                                                    photoTaken.postValue(true)
+
+
+                                                    Log.d("fotoooKaydolduuuu","sdfsdfsdf")
 
                                                 }
-                                            })
+                                            })*/
 
 
 
-                                        Global.TEXT.postValue(lineFirstText)
-                                        HATA.postValue(false)
+                                    /*    Global.TEXT.postValue(lineFirstText)
+                                        HATA.postValue(false)*/
 
 
                                     }else{
-                                        Global.TEXT.postValue("")
-                                        HATA.postValue(true)
+                                   /*     Global.TEXT.postValue("")
+                                        HATA.postValue(true)*/
                                     }
 
 
@@ -339,6 +397,8 @@ class MainActivity : AppCompatActivity() {
                             .addOnFailureListener{
 
                             }
+                    }
+
 
 
 
@@ -349,6 +409,24 @@ class MainActivity : AppCompatActivity() {
             }
 
     }
+
+    private var bitmapBuffer: Bitmap? = null
+    private fun toBitmap(image: ImageProxy): Bitmap? {
+
+
+        val buffer = image.planes[0].buffer
+        val bytes = ByteArray(buffer.remaining())
+        buffer[bytes]
+        val myBitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, null)
+        Log.d("buffeeerrr",buffer.toString())
+        Log.d("bytessss",bytes.toString())
+       return myBitmap
+    }
+
+
+
+
+
 
     private fun buildPreviewUseCase(): Preview {
         return Preview.Builder().build().also { it.setSurfaceProvider(binding.cameraPreview.surfaceProvider) }

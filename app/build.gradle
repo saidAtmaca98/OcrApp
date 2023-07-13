@@ -62,4 +62,8 @@ dependencies {
     implementation("androidx.camera:camera-mlkit-vision:${camerax_version}")
     // If you want to additionally use the CameraX Extensions library
     implementation("androidx.camera:camera-extensions:${camerax_version}")
+
+    implementation 'com.google.mlkit:object-detection:17.0.0'
+
+    implementation 'pl.droidsonroids.gif:android-gif-drawable:1.2.15'
 }
